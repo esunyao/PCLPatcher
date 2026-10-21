@@ -1,65 +1,116 @@
 # PCLPatcher
 
-Plain Craft Launcher 2 `2.99.0.0` 的静态 IL 补丁器，基于 **.NET 8 + dnlib 4.5**，跨平台（Windows / Linux 均可运行并改写 Windows PE 程序集）。
+> VibeCoding……
 
-## 补丁内容
+基于 .NET 8 和 dnlib 4.5 的 PCL 静态 IL 补丁器。**只需要待修改的 PCL EXE，不需要旧版或已打补丁的 EXE。**
 
-| 编号 | 目标 | 效果 |
+当前参考目标是 `Plain Craft Launcher 2 2.99.0.0`，补丁器版本是 `1.0.0`，两者独立。未知 PCL 版本只有六项结构检查全部通过才允许写出；这只表示结构兼容，功能未经验证。
+
+## 下载哪个包
+
+| 文件名（`<版本>` 为补丁器版本） | 使用条件 |
+|---|---|
+| `PCLPatcher-<版本>-win-x64-framework-dependent.zip` | Windows x64，已安装 .NET 8 Runtime；最小包 |
+| `PCLPatcher-<版本>-win-x64-self-contained.zip` | Windows x64，无需另装运行时 |
+| `PCLPatcher-<版本>-linux-x64-framework-dependent.tar.gz` | Linux x64，需要 .NET 8 Runtime；暂未运行验证 |
+| `PCLPatcher-<版本>-linux-x64-self-contained.tar.gz` | Linux x64，内含运行时；暂未运行验证 |
+
+免运行时包启用单文件压缩及原生库提取，不裁剪。第一次启动可能将运行时原生库提取到临时目录。Linux 包用于改写 **Windows PCL EXE**；PCL 本身仍需 Windows。Linux 的运行与功能验证状态单独标注。
+
+下载后解压，命令行进入该目录。请保留包内的中文说明与许可文件。`SHA256SUMS.txt` 是四个包的 SHA-256 校验值，`PACKAGE-SIZES.json` 记录实际大小与内含运行时版本。
+
+## 怎么用
+
+先检查，不写文件：
+
+```powershell
+.\PCLPatcher.exe --input "D:\PCL\Plain Craft Launcher 2.exe" --check
+```
+
+生成新文件，默认文件名为 `Plain Craft Launcher 2.patched.exe`：
+
+```powershell
+.\PCLPatcher.exe --input "D:\PCL\Plain Craft Launcher 2.exe"
+.\PCLPatcher.exe --input "D:\PCL\Plain Craft Launcher 2.exe" --output "D:\PCL\PCL-patched.exe"
+```
+
+原地替换，自动在原文件旁生成时间戳备份：
+
+```powershell
+.\PCLPatcher.exe --input "D:\PCL\Plain Craft Launcher 2.exe" --in-place
+.\PCLPatcher.exe --version
+```
+
+Linux 命令将 `.\PCLPatcher.exe` 换成 `./PCLPatcher`，路径使用实际挂载路径。
+
+- `--output` 与 `--in-place` 互斥；`--check` 不能与输出选项组合。
+- 已有输出文件会拒绝覆盖；换一个输出名，或确认后自行处理旧输出。
+- 原地模式发现六项均已应用时直接成功，不重复备份；输出模式仍生成约定输出，文件字节保持一致。
+- 已移除 `--donor`，旧命令会显示迁移提示。路径有中文或空格时用引号包裹。
+- PCL 自动更新可能覆盖补丁。更新后重新执行 `--check`；不支持时保留原文件，等待适配。
+
+补丁前关闭要修改的 PCL。恢复备份时也先关闭 PCL，将 `原文件.exe.bak-时间戳` 复制回原文件路径即可。备份就是写入前的原始字节；不要把备份文件和补丁器一起上传到 Release。
+
+## 六项规则
+
+| 编号 | 修改目的 | 主要定位与验证 |
 |---|---|---|
-| P1 | `PCL.FormMain/_Closure$__25-0::_Lambda$__0` | 移除拖入整合包失败时的“法律法规”提示分支 |
-| P2 | `PCL.PageDownloadInstall::LoaderInit` | 恢复 `ModDownload.DlClientListLoader`，原版游戏下载可用 |
-| P3 | `PCL.ModModpack::ModpackInstall()` | 恢复“选择整合包文件并后台安装”入口 |
-| P4 | `PCL.ModModpack::ModpackInstall(string,string,string)` | 从 donor 移植完整的整合包类型判定与安装调度 |
-| P5 | `PCL.PageDownloadModify::LoadInstanceFinished` | 显示版本修改页的 MC 版本卡片 |
-| P6 | `PCL.PageDownloadResourceDetail::InitializeStackResourceVersions` | 恢复资源详情页整合包的“安装”按钮 |
+| P1 | 恢复拖入整合包后的错误处理 | 沿 FileDrag 委托找到整合包调用及取消、崩溃分析分支，移除特定提示分支 |
+| P2 | 恢复原版游戏版本列表 | LoaderInit 中定位下载加载器与 PageLoaderInit 调用 |
+| P3 | 恢复选择整合包并后台安装 | 从目标解析文件选择接口、闭包字段及 RunInThread，保留筛选与取消 |
+| P4 | 恢复各整合包安装分派 | 保留输入自己的识别、错误处理与 finally，只恢复末尾分派；包含 MCBBS |
+| P5 | 显示 Minecraft 版本卡片 | 完整方法签名、卡片 getter 与 Visibility setter |
+| P6 | 恢复资源页整合包安装按钮 | 根据 Install_Click 调用定位事件适配器，按类型定位局部变量 |
 
-## 版本限制
+每条规则报告“需要修改 / 已应用 / 不支持”。未匹配或多个候选均拒绝修改，不将未匹配视为成功。闭包编号与局部变量槽号变化可以通过结构定位适配；方法、签名、分支、数据流变化仍可能需要人工适配。
 
-只支持 `Plain Craft Launcher 2, Version=2.99.0.0`。输入或 donor 版本不符时会直接中止。
+全部只读检查通过后才修改内存程序集。输出先写到目标目录的唯一临时文件，再重新加载、逐项验证、检查分支目标、异常边界及栈计算，最后提交。原地替换保留备份；提交前还会检查输入哈希是否变化。结构检查无法替代真实 PCL 功能测试。
 
-## 构建
+| 退出码 | 含义 |
+|---|---|
+| 0 | 检查或补丁成功 |
+| 2 | 参数、路径或输出冲突 |
+| 3 | 程序集或补丁结构不支持 |
+| 4 | 读写、构建程序集等操作失败 |
+| 5 | 修改后的 IL 或临时输出验证失败 |
 
-```bash
+## 源码结构与验证
+
+```text
+Program.cs                  入口、退出码
+CommandLine.cs              参数与迁移提示
+Patching/PatchRule.cs        三种检查结果与只读检查约定
+Patching/PatchRunner.cs      先检查、后修改、重载验证
+Patching/AtomicOutput.cs     临时文件、备份与原子提交
+Patching/Il.cs               签名定位、局部变量及 IL 安全检查
+Patching/Rules/              六项独立规则
+tests/                      无额外测试框架依赖的回归程序
+scripts/release.ps1          四包发布脚本
+```
+
+```powershell
 dotnet build -c Release
+# 通用参数、IL、防写坏与事务测试，不需要 PCL
+dotnet run --project tests/PCLPatcher.Tests.csproj -c Release
+# 真实目标回归：仅在本地提供原版文件，不提交或上传目标 EXE
+dotnet run --project tests/PCLPatcher.Tests.csproj -c Release -- "D:\PCL\原版.exe"
 ```
 
-## 运行
+目标回归涵盖六项修改、重复执行、部分恢复、方法缺失、签名变化、歧义、闭包改名、局部变量重排、模拟未知版本、中文空格路径、备份恢复及输出校验失败。P3/P4 的实际 IL 还会提取到隔离程序集执行，替换 UI、日志和安装器外部调用，检查选择取消、格式识别、MCBBS 路径、损坏压缩包、路径限制与 finally。它不启动真实安装器，完整安装、下载及 UI 仍需人工验证。
 
-```bash
-# 输出到新文件
-PCLPatcher --input "Plain Craft Launcher 2.exe" --donor "PCL-patched.exe" --output "PCL-patched-new.exe"
+## 生成 Release
 
-# 原地替换（自动生成时间戳备份）
-PCLPatcher --input "Plain Craft Launcher 2.exe" --donor "PCL-patched.exe" --in-place
+需要 .NET 8 或更新 SDK 和 PowerShell 7.4+。从仓库运行：
+
+```powershell
+pwsh -File ./scripts/release.ps1
+# 或指定一个空的产物目录
+pwsh -File ./scripts/release.ps1 -OutputDirectory "D:\Release\PCLPatcher-1.0.0"
 ```
 
-参数：
+脚本生成四个包、`SHA256SUMS.txt` 和 `PACKAGE-SIZES.json`。独立临时目录避免混入旧文件；已有产物拒绝覆盖。每包只包含补丁器、此中文说明、第三方说明和许可，不包含测试目标或源码。GitHub 工作流在推送、PR 或手动触发时构建、跑通用测试并上传资产；`v*` 标签另外创建草稿 Release，由维护者确认后发布。
 
-- `--input`：待补丁的官方 exe。
-- `--donor`：同版本且已包含 P3/P4 修改的 exe；P3 复用其选择文件调用模板，P4 直接移植其方法体。
-- `--output`：输出路径；省略且未用 `--in-place` 时输出 `<input>.patched.exe`。
-- `--in-place`：写临时文件并校验通过后，备份并替换输入文件。
+本地应额外解压两个 Windows 包，各验证启动、检查及修改，再做 PCL 功能冒烟。Linux 本轮只验证构建和归档内容，发布说明保留“暂未运行验证”。
 
-补丁器会先检测每条规则是否已应用（幂等），然后写临时文件、反编译校验 P1–P6，全部通过才覆盖。
-
-## 发布
-
-| 方式 | 体积 | 运行要求 |
-|---|---|---|
-| 框架依赖单文件 | 约 1.4 MB | 需安装 .NET 8 运行时 |
-| 自包含单文件（压缩） | 约 34 MB | 无需安装运行时 |
-| 自包含单文件（不压缩） | 约 66 MB | 无需安装运行时 |
-
-```bash
-# 框架依赖单文件（本机已装 .NET 8 时用这个）
-dotnet publish -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true
-
-# 自包含单文件（压缩，便于分发）
-dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:EnableCompressionInSingleFile=true
-
-# Linux 只需把 -r win-x64 换成 -r linux-x64
-```
-
-产物位于 `bin/Release/net8.0/<rid>/<输出目录>/`。体积主要来自 .NET 运行时：自包含发布会把整个运行时打进单文件；补丁逻辑本身只有几十 KB，dnlib 约 1.2 MB。
-
-> 注意：PCL 自动更新会用官方新版覆盖补丁；更新后需重新运行补丁器。
+单文件发布参数依据：https://learn.microsoft.com/dotnet/core/deploying/single-file/overview
+第三方许可见 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)。

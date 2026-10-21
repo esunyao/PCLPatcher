@@ -7,8 +7,12 @@
     <AssemblyName>PCLPatcher</AssemblyName>
     <RootNamespace>PCLPatcher</RootNamespace>
     <InvariantGlobalization>true</InvariantGlobalization>
+    <Version>1.0.0</Version>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="dnlib" Version="4.5.0" />
+    <Compile Remove="tests/**/*.cs" />
+    <InternalsVisibleTo Include="PCLPatcher.Tests" />
   </ItemGroup>
 </Project>
