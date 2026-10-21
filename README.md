@@ -44,18 +44,22 @@ PCLPatcher --input "Plain Craft Launcher 2.exe" --donor "PCL-patched.exe" --in-p
 
 ## 发布
 
-Windows 单文件：
+| 方式 | 体积 | 运行要求 |
+|---|---|---|
+| 框架依赖单文件 | 约 1.4 MB | 需安装 .NET 8 运行时 |
+| 自包含单文件（压缩） | 约 34 MB | 无需安装运行时 |
+| 自包含单文件（不压缩） | 约 66 MB | 无需安装运行时 |
 
 ```bash
-dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true
+# 框架依赖单文件（本机已装 .NET 8 时用这个）
+dotnet publish -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true
+
+# 自包含单文件（压缩，便于分发）
+dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:EnableCompressionInSingleFile=true
+
+# Linux 只需把 -r win-x64 换成 -r linux-x64
 ```
 
-Linux 单文件：
-
-```bash
-dotnet publish -c Release -r linux-x64 --self-contained true -p:PublishSingleFile=true
-```
-
-产物位于 `bin/Release/net8.0/<rid>/publish/`。
+产物位于 `bin/Release/net8.0/<rid>/<输出目录>/`。体积主要来自 .NET 运行时：自包含发布会把整个运行时打进单文件；补丁逻辑本身只有几十 KB，dnlib 约 1.2 MB。
 
 > 注意：PCL 自动更新会用官方新版覆盖补丁；更新后需重新运行补丁器。
