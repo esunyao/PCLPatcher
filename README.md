@@ -2,6 +2,12 @@
 
 > VibeCoding……
 
+> [!note]
+>
+> 类似方法：https://linux.do/t/topic/3050889?tl=en
+>
+> ⬆️.bat实现，文件更小
+
 基于 .NET 8 和 dnlib 4.5 的 PCL 静态 IL 补丁器。**只需要待修改的 PCL EXE，不需要旧版或已打补丁的 EXE。**
 
 当前参考目标是 `Plain Craft Launcher 2 2.99.0.0`，补丁器版本是 `1.0.0`，两者独立。未知 PCL 版本只有六项结构检查全部通过才允许写出；这只表示结构兼容，功能未经验证。
