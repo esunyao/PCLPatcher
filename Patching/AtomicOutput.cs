@@ -22,7 +22,7 @@ internal static class AtomicOutput
             {
                 string backup = options.Input + ".bak-" + DateTime.Now.ToString("yyyyMMdd-HHmmss-fffffff");
                 File.Replace(temp, options.Input, backup);
-                Console.WriteLine($"备份：{backup}");
+                ConsoleOutput.WriteLine($"备份：{backup}", ConsoleColor.Green);
             }
             else File.Move(temp, options.Output, false);
         }

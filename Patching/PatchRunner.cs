@@ -15,25 +15,43 @@ internal static class PatchRunner
         using (module)
         {
             if (module.Assembly?.Name != "Plain Craft Launcher 2") throw new UnsupportedException("程序集名必须为 Plain Craft Launcher 2。");
-            Console.WriteLine($"PCLPatcher {CommandLine.ToolVersion} | 目标 PCL {module.Assembly.Version}");
-            Console.WriteLine($"输入：{options.Input}");
-            Console.WriteLine(module.Assembly.Version?.ToString() == "2.99.0.0"
-                ? "目标版本：2.99.0.0（仍需逐项结构检查）。"
-                : "目标版本：未知版本；结构兼容不代表功能已验证。");
+            bool testedVersion = module.Assembly.Version?.ToString() == "2.99.0.0";
+            ConsoleOutput.WriteLine($"PCLPatcher {CommandLine.ToolVersion}");
+            ConsoleOutput.WriteLine("目标版本：2.99.0.0（已经过测试）", ConsoleColor.Green);
+            ConsoleOutput.WriteLine($"检测到的版本：{module.Assembly.Version}", testedVersion ? null : ConsoleColor.Yellow);
+            if (!testedVersion)
+                ConsoleOutput.WriteLine("未知版本：结构兼容，功能未经验证；仍需通过六项结构检查。", ConsoleColor.Yellow);
+            ConsoleOutput.WriteLine($"输入：{options.Input}");
             var analyses = Inspect(module);
             foreach (var a in analyses)
-                Console.WriteLine($"[{a.Id}] {a.Description}：{StateLabel(a.State)}\n  {a.Detail}");
+            {
+                var color = a.State switch
+                {
+                    PatchState.NeedsPatch => ConsoleColor.Yellow,
+                    PatchState.Applied => ConsoleColor.Green,
+                    _ => ConsoleColor.Red
+                };
+                ConsoleOutput.Write($"[{a.Id}] {a.Description}：");
+                ConsoleOutput.WriteLine(StateLabel(a.State), color);
+                ConsoleOutput.WriteLine($"  {a.Detail}", a.State == PatchState.Unsupported ? ConsoleColor.Red : ConsoleColor.DarkGray);
+            }
             if (analyses.Any(a => a.State == PatchState.Unsupported)) return 3;
             if (options.Check)
             {
-                Console.WriteLine("结构检查通过。未修改文件；未执行 PCL 功能验证。");
+                int pending = analyses.Count(a => a.State == PatchState.NeedsPatch);
+                ConsoleOutput.WriteLine(pending == 0
+                    ? "检查通过：六项均已打补丁。本次仅检查，未修改文件。"
+                    : $"检查通过：有 {pending} 项补丁可应用。本次仅检查，未修改文件。", ConsoleColor.Green);
+                if (pending > 0)
+                    ConsoleOutput.WriteLine("如需打补丁，请去掉命令中的 --check 后重新运行。", ConsoleColor.Yellow);
+                ConsoleOutput.WriteLine("未执行 PCL 功能验证。", ConsoleColor.DarkGray);
                 return 0;
             }
             bool changed = analyses.Any(a => a.State == PatchState.NeedsPatch);
             if (options.InPlace && !changed)
             {
                 Verify(module);
-                Console.WriteLine("六项均已应用，无需替换或新增备份。");
+                ConsoleOutput.WriteLine("六项均已打补丁，无需替换或新增备份。", ConsoleColor.Green);
                 return 0;
             }
             foreach (var a in analyses.Where(a => a.State == PatchState.NeedsPatch))
@@ -46,7 +64,7 @@ internal static class PatchRunner
                 if (changed) module.Write(stream);
                 else stream.Write(original);
             }, path => { using var saved = ModuleDefMD.Load(File.ReadAllBytes(path)); Verify(saved); });
-            Console.WriteLine($"完成：{options.Output}。六项结构与 IL 栈校验通过；实际功能需在 PCL 中验证。");
+            ConsoleOutput.WriteLine($"完成：{options.Output}。六项结构与 IL 栈校验通过；实际功能需在 PCL 中验证。", ConsoleColor.Green);
             return 0;
         }
     }
@@ -60,6 +78,6 @@ internal static class PatchRunner
     }
     private static string StateLabel(PatchState state) => state switch
     {
-        PatchState.NeedsPatch => "需要修改", PatchState.Applied => "已应用", _ => "不支持"
+        PatchState.NeedsPatch => "可应用（尚未打补丁）", PatchState.Applied => "已打补丁", _ => "不支持此文件"
     };
 }

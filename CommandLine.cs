@@ -13,7 +13,7 @@ internal static class CommandLine
           PCLPatcher --input <PCL.exe> --in-place
           PCLPatcher --version
 
-        无需 donor。默认输出 <原文件名>.patched.exe，已有输出不会被覆盖。
+        默认输出 <原文件名>.patched.exe，已有输出不会被覆盖。
         --check 只读检查；--in-place 校验通过后替换输入，并保留时间戳备份。
         结构检查通过不代表未知版本已经过功能验证。
         退出码：0 成功；2 参数错误；3 不支持；4 操作失败；5 输出校验失败。

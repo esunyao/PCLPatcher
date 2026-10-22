@@ -12,12 +12,12 @@ internal static class Program
             var options = CommandLine.Parse(args);
             if (options.Help)
             {
-                Console.WriteLine(CommandLine.Usage);
+                ConsoleOutput.WriteLine(CommandLine.Usage);
                 return args.Length == 0 ? 2 : 0;
             }
             if (options.Version)
             {
-                Console.WriteLine($"PCLPatcher {CommandLine.ToolVersion}");
+                ConsoleOutput.WriteLine($"PCLPatcher {CommandLine.ToolVersion}");
                 return 0;
             }
             return PatchRunner.Run(options);
@@ -30,7 +30,7 @@ internal static class Program
 
     private static int Fail(int code, string message)
     {
-        Console.Error.WriteLine($"失败：{message}");
+        ConsoleOutput.WriteLine($"失败：{message}", ConsoleColor.Red, error: true);
         return code;
     }
 }
